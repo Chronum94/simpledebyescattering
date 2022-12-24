@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "simpledebyescattering"
-version = "0.1.1"
+version = "0.1.2"
 description = ""
 authors = ["Anubhab Haldar <ahaldar@bu.edu>"]
 license = "MIT"
