@@ -12,7 +12,7 @@ import warnings
 
 import numpy as np
 
-from xrayfunctions import initialize_atomic_form_factor_splines, pdist_in_chunks, cdist_in_chunks
+from simpledebyescattering.xrayfunctions import initialize_atomic_form_factor_splines, pdist_in_chunks, cdist_in_chunks
 
 
 def one_species_contribution(positions, form_factor_spline, s) -> np.ndarray:
