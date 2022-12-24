@@ -1,22 +1,16 @@
-# flake8: noqa
-"""Definition of the XrayDebye class.
-
-This module defines the XrayDebye class for calculation
-of X-ray scattering properties from atomic cluster
-using Debye formula.
-"""
-
-
 from itertools import combinations
-import warnings
 
 import numpy as np
 
-from simpledebyescattering.xrayfunctions import initialize_atomic_form_factor_splines, pdist_in_chunks, cdist_in_chunks
+from simpledebyescattering.xrayfunctions import (
+    initialize_atomic_form_factor_splines,
+    pdist_in_chunks,
+    cdist_in_chunks,
+)
 
 
 def one_species_contribution(positions, form_factor_spline, s) -> np.ndarray:
-    
+
     contribution = np.zeros_like(s)
     n_atoms = positions.shape[0]
 
@@ -29,13 +23,14 @@ def one_species_contribution(positions, form_factor_spline, s) -> np.ndarray:
     return contribution
 
 
-def one_species_hist_contribution(positions, form_factor_spline, s, bin_width=1e-3) -> np.ndarray:
+def one_species_hist_contribution(
+    positions, form_factor_spline, s, bin_width=1e-3
+) -> np.ndarray:
     n_atoms: int = positions.shape[0]
     contribution: np.ndarray = np.zeros_like(s)
 
     if positions.shape[0] == 1:
         return form_factor_spline(s) ** 2 * n_atoms
-
 
     for distances in pdist_in_chunks(positions):
         nbins = int(np.ceil(np.ptp(distances) / bin_width)) + 1
@@ -159,10 +154,10 @@ class XrayDebye:
         self,
         atoms: "ase.Atoms",
         wavelength: float,
-        damping: float=0.04,
-        method: str="Iwasa",
-        alpha: float=1.01,
-        histogram_approximation: bool=True
+        damping: float = 0.04,
+        method: str = "Iwasa",
+        alpha: float = 1.01,
+        histogram_approximation: bool = True,
     ):
         """[summary]
 
@@ -227,16 +222,15 @@ class XrayDebye:
             Intensity at given scattering vector `s`.
         """
 
-        pre = np.exp(-self.damping * s ** 2 / 2)
-
+        pre = np.exp(-self.damping * s**2 / 2)
 
         if self.method == "Iwasa":
             sinth = self.wavelength * s / 2.0
-            positive = 1.0 - sinth ** 2
+            positive = 1.0 - sinth**2
             positive[positive < 0] = 0
             costh = np.sqrt(positive)
             cos2th = np.cos(2.0 * np.arccos(costh))
-            pre *= costh / (1.0 + self.alpha * cos2th ** 2)
+            pre *= costh / (1.0 + self.alpha * cos2th**2)
 
         I = np.zeros_like(s)
 
@@ -244,7 +238,7 @@ class XrayDebye:
         symbols = set(self.atoms.symbols)
 
         for symbol in symbols:
-            print(f"Calculating on-diagonal {symbol} block")
+            # print(f"Calculating on-diagonal {symbol} block")
             if not self.hist_approx:
                 I[:] += one_species_contribution(
                     self.atoms[self.atoms.symbols == symbol].positions,
@@ -253,15 +247,17 @@ class XrayDebye:
                 )
             else:
                 I[:] += one_species_hist_contribution(
-                self.atoms[self.atoms.symbols == symbol].positions, self.atomic_form_factor_dict[symbol],
-                s)
+                    self.atoms[self.atoms.symbols == symbol].positions,
+                    self.atomic_form_factor_dict[symbol],
+                    s,
+                )
 
         # Calculation contribution from pairs of different atomic species
         symbols_pairs = combinations(symbols, 2)
 
         for symbols_pair in symbols_pairs:
             symbol1, symbol2 = symbols_pair
-            print(f"Calculating off-diagonal {symbol1}+{symbol2} blocks")
+            # print(f"Calculating off-diagonal {symbol1}+{symbol2} blocks")
             if not self.hist_approx:
                 I[:] += two_species_contribution(
                     self.atoms[self.atoms.symbols == symbol1].positions,
@@ -273,13 +269,16 @@ class XrayDebye:
 
             else:
                 I[:] += two_species_hist_contribution(
-                self.atoms[self.atoms.symbols == symbol1].positions, self.atoms[self.atoms.symbols == symbol2].positions, self.atomic_form_factor_dict[symbol1],
-                self.atomic_form_factor_dict[symbol2],s)
+                    self.atoms[self.atoms.symbols == symbol1].positions,
+                    self.atoms[self.atoms.symbols == symbol2].positions,
+                    self.atomic_form_factor_dict[symbol1],
+                    self.atomic_form_factor_dict[symbol2],
+                    s,
+                )
 
+        # lin_zhigilei_factor = [len(self.atoms.symbols == x) * self.atomic_form_factor_dict[x](s) ** 2 for x in symbols]
 
-        lin_zhigilei_factor = [len(self.atoms.symbols == x) * self.atomic_form_factor_dict[x](s) ** 2 for x in symbols]
-
-        return pre * I # / np.sum(lin_zhigilei_factor, axis=0)
+        return pre * I  # / np.sum(lin_zhigilei_factor, axis=0)
 
     def calc_pattern(self, x=None, mode="XRD"):
         r"""
