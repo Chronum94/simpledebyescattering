@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "simpledebyescattering"
+version = "0.1.0"
+description = ""
+authors = ["Anubhab Haldar <ahaldar@bu.edu>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+numpy = "1.14.0"
+scipy = "^1.9.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
