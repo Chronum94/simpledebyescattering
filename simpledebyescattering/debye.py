@@ -8,6 +8,8 @@ from simpledebyescattering.xrayfunctions import (
     cdist_in_chunks,
 )
 
+from multimethod import multimethod
+
 
 def one_species_contribution(positions, form_factor_spline, s) -> np.ndarray:
 
@@ -371,3 +373,41 @@ class XrayDebye:
             fig.savefig(filename)
 
         return ax
+
+from typing import Iterable
+@multimethod
+def calc_pattern(xrdobj:XrayDebye, x:Iterable[float]):
+    r"""
+    Calculate X-ray diffraction pattern or
+    small angle X-ray scattering pattern.
+
+    Parameters:
+
+    x: float array
+        points where intensity will be calculated.
+        XRD - 2theta values, in degrees;
+        SAXS - q values in 1/Å
+        (`q = 2 \pi \cdot s = 4 \pi \sin( \theta) / \lambda`).
+        If ``x`` is ``None`` then default values will be used.
+
+    mode: {'XRD', 'SAXS'}
+        the mode of calculation: X-ray diffraction (XRD) or
+        small-angle scattering (SAXS).
+
+    Returns:
+        list of intensities calculated for values given in ``x``.
+    """
+    # assert mode in ["XRD", "SAXS"]
+
+    cls = output_data_class["XRD"]
+
+    data = cls.calculate(xrdobj, x)
+    return data.intensities
+
+    # if mode == 'XRD':
+    # elif mode == 'SAXS':
+    #    return SAXSData.calculate(self)
+    # intensity_list = np.array(result)
+    # xrd = XRDebyeData(mode, twotheta_list, q_list, intensity_list)
+    # self._xrddata = xrd
+    # return xrd
