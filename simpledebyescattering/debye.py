@@ -94,57 +94,53 @@ def two_species_hist_contribution(
 
     return contribution
 
+# class XRDData:
+#     mode = "XRD"
+#     xvalues_name = "2theta"
 
-# End support
+#     def __init__(self, twotheta, intensities):
+#         self.twotheta = twotheta
+#         self.intensities = intensities
 
+#     @classmethod
+#     def calculate(cls, xrd, twotheta):
+#         if twotheta is None:
+#             twotheta = np.linspace(15, 55, 100)
+#         else:
+#             twotheta = np.asarray(twotheta)
 
-class XRDData:
-    mode = "XRD"
-    xvalues_name = "2theta"
+#         svalues = 2 * np.sin(twotheta * np.pi / 180 / 2.0) / xrd.wavelength
+#         result = xrd.get(svalues)
+#         return cls(twotheta, np.array(result))
 
-    def __init__(self, twotheta, intensities):
-        self.twotheta = twotheta
-        self.intensities = intensities
-
-    @classmethod
-    def calculate(cls, xrd, twotheta):
-        if twotheta is None:
-            twotheta = np.linspace(15, 55, 100)
-        else:
-            twotheta = np.asarray(twotheta)
-
-        svalues = 2 * np.sin(twotheta * np.pi / 180 / 2.0) / xrd.wavelength
-        result = xrd.get(svalues)
-        return cls(twotheta, np.array(result))
-
-    def xvalues(self):
-        return self.twotheta.copy()
+#     def xvalues(self):
+#         return self.twotheta.copy()
 
 
-class SAXSData:
-    mode = "SAXS"
-    xvalues_name = "q(1/Å)"
+# class SAXSData:
+#     mode = "SAXS"
+#     xvalues_name = "q(1/Å)"
 
-    def __init__(self, qvalues, intensities):
-        self.qvalues = qvalues
-        self.intensities = intensities
+#     def __init__(self, qvalues, intensities):
+#         self.qvalues = qvalues
+#         self.intensities = intensities
 
-    @classmethod
-    def calculate(cls, xrd, qvalues):
-        if qvalues is None:
-            qvalues = np.logspace(-3, -0.3, 100)
-        else:
-            qvalues = np.asarray(qvalues)
+#     @classmethod
+#     def calculate(cls, xrd, qvalues):
+#         if qvalues is None:
+#             qvalues = np.logspace(-3, -0.3, 100)
+#         else:
+#             qvalues = np.asarray(qvalues)
 
-        svalues = qvalues / (2 * np.pi)
-        result = xrd.get(svalues)
-        return cls(qvalues, result)
+#         svalues = qvalues / (2 * np.pi)
+#         result = xrd.get(svalues)
+#         return cls(qvalues, result)
 
-    def xvalues(self):
-        return self.qvalues.copy()
+#     def xvalues(self):
+#         return self.qvalues.copy()
 
 
-output_data_class = {"XRD": XRDData, "SAXS": SAXSData}
+# output_data_class = {"XRD": XRDData, "SAXS": SAXSData}
 
 
 class XrayDebye:
@@ -185,7 +181,6 @@ class XrayDebye:
         histogram_approximation : bool, optional
             [description], by default True
         """
-        # XXX deprecate warn
 
         self.wavelength = wavelength
         self.method = method
@@ -194,189 +189,19 @@ class XrayDebye:
         self.damping = damping
         self.atoms = atoms
 
-        self.x2q = {
-            "XRD": lambda x: 2 * np.sin(x * np.pi / 180 / 2.0) / self.wavelength,
-            "SAXS": lambda x: x,
-        }
         self.atomic_form_factor_dict = initialize_atomic_form_factor_splines(
             set(self.atoms.symbols), np.linspace(0, 6, 500)
         )
 
         self.hist_approx = histogram_approximation
 
-        self._xrddata = None
-        # TODO: setup atomic form factors if method != 'Iwasa'
-
     def set_damping(self, damping):
         """set B-factor for thermal damping"""
         self.damping = damping
 
-    def get(self, s):
-        r"""Get the powder x-ray (XRD) scattering intensity
-        using the Debye-Formula at single point.
-
-        Parameters:
-
-        s: float array, in inverse Angstrom
-            scattering vector value (`s = q / 2\pi`).
-
-        Returns:
-            Intensity at given scattering vector `s`.
-        """
-
-        pre = np.exp(-self.damping * s**2 / 2)
-
-        if self.method == "Iwasa":
-            sinth = self.wavelength * s / 2.0
-            positive = 1.0 - sinth**2
-            positive[positive < 0] = 0
-            costh = np.sqrt(positive)
-            cos2th = np.cos(2.0 * np.arccos(costh))
-            pre *= costh / (1.0 + self.alpha * cos2th**2)
-
-        I = np.zeros_like(s)
-
-        # Calculate contribution from pairs of same atomic species
-        symbols = set(self.atoms.symbols)
-
-        for symbol in symbols:
-            # print(f"Calculating on-diagonal {symbol} block")
-            if not self.hist_approx:
-                I[:] += one_species_contribution(
-                    self.atoms[self.atoms.symbols == symbol].positions,
-                    self.atomic_form_factor_dict[symbol],
-                    s,
-                )
-            else:
-                I[:] += one_species_hist_contribution(
-                    self.atoms[self.atoms.symbols == symbol].positions,
-                    self.atomic_form_factor_dict[symbol],
-                    s,
-                )
-
-        # Calculation contribution from pairs of different atomic species
-        symbols_pairs = combinations(symbols, 2)
-
-        for symbols_pair in symbols_pairs:
-            symbol1, symbol2 = symbols_pair
-            # print(f"Calculating off-diagonal {symbol1}+{symbol2} blocks")
-            if not self.hist_approx:
-                I[:] += two_species_contribution(
-                    self.atoms[self.atoms.symbols == symbol1].positions,
-                    self.atoms[self.atoms.symbols == symbol2].positions,
-                    self.atomic_form_factor_dict[symbol1],
-                    self.atomic_form_factor_dict[symbol2],
-                    s,
-                )
-
-            else:
-                I[:] += two_species_hist_contribution(
-                    self.atoms[self.atoms.symbols == symbol1].positions,
-                    self.atoms[self.atoms.symbols == symbol2].positions,
-                    self.atomic_form_factor_dict[symbol1],
-                    self.atomic_form_factor_dict[symbol2],
-                    s,
-                )
-
-        # lin_zhigilei_factor = [len(self.atoms.symbols == x) * self.atomic_form_factor_dict[x](s) ** 2 for x in symbols]
-
-        return pre * I  # / np.sum(lin_zhigilei_factor, axis=0)
-
-    def calc_pattern(self, x=None, mode="XRD"):
-        r"""
-        Calculate X-ray diffraction pattern or
-        small angle X-ray scattering pattern.
-
-        Parameters:
-
-        x: float array
-            points where intensity will be calculated.
-            XRD - 2theta values, in degrees;
-            SAXS - q values in 1/Å
-            (`q = 2 \pi \cdot s = 4 \pi \sin( \theta) / \lambda`).
-            If ``x`` is ``None`` then default values will be used.
-
-        mode: {'XRD', 'SAXS'}
-            the mode of calculation: X-ray diffraction (XRD) or
-            small-angle scattering (SAXS).
-
-        Returns:
-            list of intensities calculated for values given in ``x``.
-        """
-        assert mode in ["XRD", "SAXS"]
-
-        cls = output_data_class[mode]
-
-        self._xrddata = cls.calculate(self, x)
-        return self._xrddata.intensities
-
-        # if mode == 'XRD':
-        # elif mode == 'SAXS':
-        #    return SAXSData.calculate(self)
-        # intensity_list = np.array(result)
-        # xrd = XRDebyeData(mode, twotheta_list, q_list, intensity_list)
-        # self._xrddata = xrd
-        # return xrd
-
-    @property
-    def mode(self):
-        return self._xrddata.mode
-
-    def write_pattern(self, filename):
-        """Save calculated data to file specified by ``filename`` string."""
-        with open(filename, "w") as fd:
-            self._write_pattern(fd)
-
-    def _write_pattern(self, fd):
-        data = self._xrddata
-
-        fd.write("# Wavelength = %f\n" % self.wavelength)
-        fd.write(f"# {data.xvalues_name}\tIntensity\n")
-
-        for xval, yval in zip(data.xvalues(), data.intensities):
-            fd.write("  %f\t%f\n" % (xval, yval))
-
-    def plot_pattern(self, filename=None, show=False, ax=None):
-        """Plot XRD or SAXS depending on filled data
-
-        Uses Matplotlib to plot pattern. Use *show=True* to
-        show the figure and *filename='abc.png'* or
-        *filename='abc.eps'* to save the figure to a file.
-
-        Returns:
-            ``matplotlib.axes.Axes`` object."""
-
-        import matplotlib.pyplot as plt
-
-        if ax is None:
-            plt.clf()  # clear figure
-            ax = plt.gca()
-
-        if self.mode == "XRD":
-            x, y = np.array(self.twotheta_list), np.array(self.intensity_list)
-            ax.plot(x, y / np.max(y), ".-")
-            ax.set_xlabel("2$\\theta$")
-            ax.set_ylabel("Intensity")
-        elif self.mode == "SAXS":
-            x = self._xrddata.xvalues()
-            y = np.array(self._xrddata.intensities)
-            ax.loglog(x, y / np.max(y), ".-")
-            ax.set_xlabel("q, 1/Å")
-            ax.set_ylabel("Intensity")
-        else:
-            raise Exception("No data available, call calc_pattern() first")
-
-        if show:
-            plt.show()
-        if filename is not None:
-            fig = ax.get_figure()
-            fig.savefig(filename)
-
-        return ax
-
 from typing import Iterable
 @multimethod
-def calc_pattern(xrdobj:XrayDebye, x:Iterable[float]):
+def calc_pattern(xrdobj:XrayDebye, x:Iterable[float], mode:str):
     r"""
     Calculate X-ray diffraction pattern or
     small angle X-ray scattering pattern.
@@ -397,17 +222,87 @@ def calc_pattern(xrdobj:XrayDebye, x:Iterable[float]):
     Returns:
         list of intensities calculated for values given in ``x``.
     """
-    # assert mode in ["XRD", "SAXS"]
+    assert mode in ["XRD", "SAXS"]
+    x = np.array(x)
+    if mode == "XRD":
+        svalues = 2 * np.sin(x * np.pi / 180 / 2.0) / xrdobj.wavelength
+    elif mode == "SAXS":
+        svalues = x / (2 * np.pi)
 
-    cls = output_data_class["XRD"]
 
-    data = cls.calculate(xrdobj, x)
+    # cls = output_data_class["XRD"]
+
+    data = _calculate(xrdobj, svalues)
     return data.intensities
 
-    # if mode == 'XRD':
-    # elif mode == 'SAXS':
-    #    return SAXSData.calculate(self)
-    # intensity_list = np.array(result)
-    # xrd = XRDebyeData(mode, twotheta_list, q_list, intensity_list)
-    # self._xrddata = xrd
-    # return xrd
+@multimethod
+def _calculate(xrdobj: XrayDebye, s: np.ndarray):
+    r"""Get the powder x-ray (XRD) scattering intensity
+    using the Debye-Formula at single point.
+
+    Parameters:
+
+    s: float array, in inverse Angstrom
+        scattering vector value (`s = q / 2\pi`).
+
+    Returns:
+        Intensity at given scattering vector `s`.
+    """
+
+    pre = np.exp(-xrdobj.damping * s**2 / 2)
+
+    if xrdobj.method == "Iwasa":
+        sinth = xrdobj.wavelength * s / 2.0
+        positive = 1.0 - sinth**2
+        positive[positive < 0] = 0
+        costh = np.sqrt(positive)
+        cos2th = np.cos(2.0 * np.arccos(costh))
+        pre *= costh / (1.0 + xrdobj.alpha * cos2th**2)
+
+    I = np.zeros_like(s)
+
+    # Calculate contribution from pairs of same atomic species
+    symbols = set(xrdobj.atoms.symbols)
+
+    for symbol in symbols:
+        # print(f"Calculating on-diagonal {symbol} block")
+        if not xrdobj.hist_approx:
+            I[:] += one_species_contribution(
+                xrdobj.atoms[xrdobj.atoms.symbols == symbol].positions,
+                xrdobj.atomic_form_factor_dict[symbol],
+                s,
+            )
+        else:
+            I[:] += one_species_hist_contribution(
+                xrdobj.atoms[xrdobj.atoms.symbols == symbol].positions,
+                xrdobj.atomic_form_factor_dict[symbol],
+                s,
+            )
+
+    # Calculation contribution from pairs of different atomic species
+    symbols_pairs = combinations(symbols, 2)
+
+    for symbols_pair in symbols_pairs:
+        symbol1, symbol2 = symbols_pair
+        # print(f"Calculating off-diagonal {symbol1}+{symbol2} blocks")
+        if not xrdobj.hist_approx:
+            I[:] += two_species_contribution(
+                xrdobj.atoms[xrdobj.atoms.symbols == symbol1].positions,
+                xrdobj.atoms[xrdobj.atoms.symbols == symbol2].positions,
+                xrdobj.atomic_form_factor_dict[symbol1],
+                xrdobj.atomic_form_factor_dict[symbol2],
+                s,
+            )
+
+        else:
+            I[:] += two_species_hist_contribution(
+                xrdobj.atoms[xrdobj.atoms.symbols == symbol1].positions,
+                xrdobj.atoms[xrdobj.atoms.symbols == symbol2].positions,
+                xrdobj.atomic_form_factor_dict[symbol1],
+                xrdobj.atomic_form_factor_dict[symbol2],
+                s,
+            )
+
+    # lin_zhigilei_factor = [len(xrdobj.atoms.symbols == x) * xrdobj.atomic_form_factor_dict[x](s) ** 2 for x in symbols]
+
+    return pre * I  # / np.sum(lin_zhigilei_factor, axis=0)
