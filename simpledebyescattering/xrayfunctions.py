@@ -47,7 +47,7 @@ def waasmaier_atomic_form_factor_spline(coeffs: list, s_vect: np.ndarray):
     return InterpolatedUnivariateSpline(x=s_vect, y=ff, k=3)
 
 
-def pdist_in_chunks(arr1, chunksize=5000):
+def pdist_in_chunks(arr1, chunksize=1000):
     arr1len = arr1.shape[0]
 
     i = 0
@@ -66,7 +66,7 @@ def pdist_in_chunks(arr1, chunksize=5000):
         i += 1
 
 
-def cdist_in_chunks(arr1, arr2, chunksize=5000):
+def cdist_in_chunks(arr1, arr2, chunksize=1000):
     arr1len = arr1.shape[0]
     arr2len = arr2.shape[0]
 
